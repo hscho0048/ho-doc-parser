@@ -18,9 +18,28 @@ PDF · DOCX · PPTX · PPT · ODT · HWPX · XLSX 문서에서 **본문 텍스�
 
 ## 로컬 설치
 
-Python 3.9 이상이 필요합니다(3.12 권장). 저장소를 받은 뒤 가상환경을 만들어 설치합니다.
+### 딸깍 설치 · 실행
 
-### macOS
+저장소를 받은 폴더(GitHub의 **Code → Download ZIP**을 풀어도 됨)에서 더블클릭합니다.
+
+| | 설치 (처음 한 번) | 실행 |
+|---|---|---|
+| Windows | `install_windows.bat` | `run_windows.bat` |
+| macOS | `install_mac.command` | `run_mac.command` |
+
+- 설치 파일이 Python 3.10 이상을 찾고, 없으면 winget(Windows)·Homebrew(macOS)로 Python 3.12 설치를 제안합니다.
+- 프로젝트 폴더 안에 가상환경 `.venv`를 만들고 패키지를 설치합니다. **전체(OCR 포함, 권장)** 와 **기본(OCR 없음)** 중 고를 수 있습니다.
+- 다른 Python이나 시스템 설정은 건드리지 않습니다. 지우려면 `.venv` 폴더만 삭제하면 됩니다.
+- Windows는 설치 끝에 바탕화면 바로가기를 만들 수 있습니다.
+- 실행 파일은 로컬 GUI를 띄우고 브라우저를 엽니다. 창을 닫으면 종료됩니다.
+- macOS에서 ZIP으로 받았다면 처음 더블클릭할 때 "확인되지 않은 개발자" 경고가 뜰 수 있습니다.
+  파일을 **우클릭 → 열기**로 한 번 열거나, 터미널에서 `bash install_mac.command`로 실행하세요.
+
+### 직접 설치
+
+Python 3.10 이상이 필요합니다(3.12 권장, `.python-version`). 저장소를 받은 뒤 가상환경을 만들어 설치합니다.
+
+#### macOS
 
 ```bash
 git clone https://github.com/hscho0048/ho-doc-parser.git
@@ -47,7 +66,7 @@ pip install -r requirements.txt
 - 구형 PPT의 표까지 복원하려면 LibreOffice를 설치하세요(`brew install --cask libreoffice`, 선택).
 - WMF/EMF 그림은 macOS에서 PNG로 변환되지 않고 원본 형식 그대로 저장됩니다.
 
-### Windows (PowerShell)
+#### Windows (PowerShell)
 
 ```powershell
 git clone https://github.com/hscho0048/ho-doc-parser.git
