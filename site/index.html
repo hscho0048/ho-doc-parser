@@ -74,6 +74,8 @@ h1 small { color: var(--muted); font-weight: 400; font-size: 12px; margin-left: 
 .stat { background: var(--bg); border-radius: 8px; padding: 6px 10px; }
 .stat .k { font-size: 11px; color: var(--muted); white-space: nowrap; }
 .stat .v { font-family: var(--mono); font-size: 15px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.savebar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.savebar .lbl { font-size: 12px; color: var(--muted); margin-right: 2px; }
 .warns { margin: 0; padding-left: 18px; color: var(--warn); font-size: 13px; }
 .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); overflow-x: auto; }
 .tab { white-space: nowrap; border: 0; background: none; font: inherit; padding: 8px 12px; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
@@ -235,16 +237,16 @@ async function parse(file, idx) {
   renderRuns(); render();
 }
 
-$("#zip").onclick = async () => {
-  const btn = $("#zip");
-  const done = runs.filter(r => r.result && r.jobId);
+async function saveZip(list, name, btn) {
+  const label = btn.textContent;
   btn.disabled = true; btn.textContent = "묶는 중…";
-  const jobs = done.map(r => ({dir: "/jobs/" + r.jobId, name: r.result.name, success: r.result.success,
+  const jobs = list.map(r => ({dir: "/jobs/" + r.jobId, name: r.result.name, success: r.result.success,
                                file_type: r.result.file_type, error: r.result.error, seconds: r.result.seconds}));
   const m = await call({type: "zip", jobs});
-  btn.disabled = false; btn.textContent = "전체 결과 ZIP";
-  if (m.type === "zip") download("ho_results.zip", m.data, "application/zip");
-};
+  btn.disabled = false; btn.textContent = label;
+  if (m.type === "zip") download(name, m.data, "application/zip");
+}
+$("#zip").onclick = () => saveZip(runs.filter(r => r.result && r.jobId), "ho_results.zip", $("#zip"));
 
 function renderRuns() {
   const box = $("#runs");
@@ -289,6 +291,10 @@ function render() {
         ${stat("글자 수", (m.char_count ?? 0).toLocaleString())}
       </div>
       ${res.warnings?.length ? `<ul class="warns">${res.warnings.map(w => `<li>${esc(w)}</li>`).join("")}</ul>` : ""}
+      ${res.success ? `<div class="savebar"><span class="lbl">저장</span>
+        <button class="btn" id="save-md">Markdown (.md)</button>
+        <button class="btn" id="save-json">JSON (.json)</button>
+        <button class="btn primary" id="save-zip">전부 ZIP (이미지 포함)</button></div>` : ""}
     </section>
     ${res.success ? `
     <nav class="tabs" role="tablist">
@@ -297,7 +303,13 @@ function render() {
     </nav>
     <section class="panel" id="panel"></section>` : ""}`;
   main.querySelectorAll(".tab").forEach(t => t.onclick = () => { tab = t.dataset.tab; render(); });
-  if (res.success) renderTab(run);
+  if (res.success) {
+    const stem = res.name.replace(/[.][^.]+$/, "");
+    $("#save-md").onclick = () => download(stem + ".md", res.markdown, "text/markdown");
+    $("#save-json").onclick = () => download(stem + ".json", JSON.stringify(res.elements, null, 2), "application/json");
+    $("#save-zip").onclick = () => saveZip([run], stem + ".zip", $("#save-zip"));
+    renderTab(run);
+  }
 }
 
 function withBlobs(html, run) {
@@ -312,10 +324,14 @@ function elementsHtml(run) {
 }
 
 function download(name, data, type) {
+  // the link must be in the page for Safari to start the download
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([data], {type}));
-  a.download = name; a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  a.download = name;
+  a.style.display = "none";
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 30000);
 }
 
 function renderTab(run) {

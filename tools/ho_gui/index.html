@@ -61,6 +61,8 @@ h1 small { color: var(--muted); font-weight: 400; font-size: 12px; margin-left: 
 .stat { background: var(--bg); border-radius: 8px; padding: 6px 10px; }
 .stat .k { font-size: 11px; color: var(--muted); white-space: nowrap; }
 .stat .v { font-family: var(--mono); font-size: 15px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.savebar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.savebar .lbl { font-size: 12px; color: var(--muted); margin-right: 2px; }
 .warns { margin: 0; padding-left: 18px; color: var(--warn); font-size: 13px; }
 .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); overflow-x: auto; }
 .tab { white-space: nowrap; border: 0; background: none; font: inherit; padding: 8px 12px; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
@@ -130,7 +132,10 @@ footer { font-size: 11.5px; line-height: 1.6; color: var(--muted); border-top: 1
     </section>
 
     <section>
-      <h2 class="section-title">실행 기록</h2>
+      <div class="row" style="margin-bottom:8px">
+        <h2 class="section-title" style="margin:0">실행 기록</h2>
+        <button class="btn" id="zip-all" disabled title="성공한 문서 전부의 .md · .json · 이미지를 ZIP 하나로 저장">전체 결과 ZIP</button>
+      </div>
       <div class="runs" id="runs"><div class="hint" style="margin:0">아직 실행한 문서가 없습니다.</div></div>
     </section>
 
@@ -157,7 +162,7 @@ fetch("/api/info").then(r => r.json()).then(info => {
   $("#notice").textContent = info.notice || "";
   if (!info.ocr) {
     $("#opt-ocr").disabled = true;
-    $("#ocr-hint").textContent = "이 Python에는 rapidocr가 없어 OCR을 쓸 수 없습니다. .venv-ocr로 실행하세요.";
+    $("#ocr-hint").textContent = "OCR 패키지가 설치되지 않았습니다. 설치 파일을 다시 실행해 [1] 전체를 고르세요.";
     $("#ocr-hint").hidden = false;
     $("#opt-threads").disabled = true;
   }
@@ -195,8 +200,19 @@ async function parse(file, idx) {
     runs[idx].result = {success: false, error: String(e), name: file.name};
   }
   if (current === null || runs[current].state === "running") current = idx;
+  $("#zip-all").disabled = !runs.some(r => r.result?.success);
   renderRuns(); render();
 }
+
+function saveZip(jobs, name) {
+  const a = document.createElement("a");
+  a.href = "/api/zip?" + new URLSearchParams({jobs: jobs.join(","), name});
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+$("#zip-all").onclick = () => saveZip(runs.filter(r => r.result?.success).map(r => r.result.job), "ho_results.zip");
 
 function renderRuns() {
   const box = $("#runs");
@@ -244,6 +260,10 @@ function render() {
         ${stat("글자 수", (m.char_count ?? 0).toLocaleString())}
       </div>
       ${res.warnings?.length ? `<ul class="warns">${res.warnings.map(w => `<li>${esc(w)}</li>`).join("")}</ul>` : ""}
+      ${res.success ? `<div class="savebar"><span class="lbl">저장</span>
+        <button class="btn" id="save-md">Markdown (.md)</button>
+        <button class="btn" id="save-json">JSON (.json)</button>
+        <button class="btn primary" id="save-zip">전부 ZIP (이미지 포함)</button></div>` : ""}
     </section>
     ${res.success ? `
     <nav class="tabs" role="tablist">
@@ -252,7 +272,13 @@ function render() {
     </nav>
     <section class="panel" id="panel"></section>` : ""}`;
   main.querySelectorAll(".tab").forEach(t => t.onclick = () => { tab = t.dataset.tab; render(); });
-  if (res.success) renderTab(res);
+  if (res.success) {
+    const stem = res.name.replace(/\.[^.]+$/, "");
+    $("#save-md").onclick = () => download(stem + ".md", res.markdown, "text/markdown");
+    $("#save-json").onclick = () => download(stem + ".json", JSON.stringify(res.elements, null, 2), "application/json");
+    $("#save-zip").onclick = () => saveZip([res.job], stem + ".zip");
+    renderTab(res);
+  }
 }
 
 function hoElementsHtml(res) {
@@ -265,10 +291,14 @@ function hoElementsHtml(res) {
 }
 
 function download(name, text, type) {
+  // the link must be in the page for Safari to start the download
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([text], {type}));
-  a.download = name; a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  a.download = name;
+  a.style.display = "none";
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 30000);
 }
 
 function renderTab(res) {

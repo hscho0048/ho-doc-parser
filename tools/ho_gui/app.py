@@ -20,6 +20,7 @@ import tempfile
 import threading
 import uuid
 import webbrowser
+import zipfile
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -126,6 +127,38 @@ def run_parse(name: str, data: bytes, opts: dict) -> dict:
     return result
 
 
+def make_zip(job_ids: list) -> bytes:
+    """<stem>.md, <stem>.json (elements), <stem>_images/ per job + _summary.json, names never clash."""
+    import io
+    from docparser.batch import output_names
+    from docparser.images import _safe
+
+    jobs = [JOBS[j] for j in job_ids if j in JOBS]
+    names = output_names([Path(j["result"]["name"]) for j in jobs])
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        summary = []
+        for j in jobs:
+            res, stem = j["result"], names[Path(j["result"]["name"])]
+            summary.append({"file": res["name"], "output": stem, "success": res.get("success"),
+                            "type": res.get("file_type"), "error": res.get("error"),
+                            "seconds": (res.get("resources") or {}).get("wall_s")})
+            if not res.get("success"):
+                continue
+            old_dir = (res.get("metadata") or {}).get("image_dir") or ""
+            new_dir = f"{_safe(stem)}_images"
+            fix = (lambda t: t.replace(old_dir + "/", new_dir + "/")) if old_dir else (lambda t: t)
+            zf.writestr(f"{stem}.md", fix(res.get("markdown") or ""))
+            zf.writestr(f"{stem}.json", fix(json.dumps(res.get("elements") or {}, ensure_ascii=False, indent=2,
+                                                       default=str)))
+            img_dir = j["out"] / old_dir if old_dir else None
+            if img_dir and img_dir.is_dir():
+                for f in sorted(img_dir.iterdir()):
+                    zf.writestr(f"{new_dir}/{f.name}", f.read_bytes())
+        zf.writestr("_summary.json", json.dumps(summary, ensure_ascii=False, indent=2))
+    return buf.getvalue()
+
+
 # ---------------------------------------------------------------------- HTTP
 
 
@@ -157,6 +190,14 @@ class Handler(BaseHTTPRequestHandler):
         if u.path == "/api/info":
             return self._json({"version": __version__, "ocr": ocr_available(), "notice": HWP_NOTICE,
                                "formats": sorted(EXTENSION_MAP), "python": sys.executable})
+        if u.path == "/api/zip":
+            ids = [j for j in (q.get("jobs") or [""])[0].split(",") if j in JOBS]
+            if not ids:
+                return self._json({"error": "no finished jobs"}, 404)
+            name = (q.get("name") or ["ho_results.zip"])[0]
+            from urllib.parse import quote
+            return self._send(200, make_zip(ids), "application/zip",
+                              {"Content-Disposition": f"attachment; filename*=UTF-8''{quote(name)}"})
         m = re.match(r"^/api/job/([0-9a-f]{10})$", u.path)
         if m and m.group(1) in JOBS:
             return self._json(JOBS[m.group(1)]["result"])
