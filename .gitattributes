@@ -1,0 +1,10 @@
+* text=auto eol=lf
+*.bat text eol=crlf
+*.pdf binary
+*.png binary
+*.jpg binary
+*.docx binary
+*.pptx binary
+*.ppt binary
+*.odt binary
+*.xlsx binary

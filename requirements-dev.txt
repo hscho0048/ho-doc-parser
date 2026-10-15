@@ -1,0 +1,4 @@
+-r requirements.txt
+pytest>=8          # MIT
+reportlab>=4       # BSD  - generates PDF test fixtures / benchmark documents
+pywin32>=306; sys_platform == "win32"   # PSF - optional: build fixtures via Word/PowerPoint COM

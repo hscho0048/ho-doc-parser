@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ho 레퍼런스 실행기</title>
+<meta name="description" content="PDF · DOCX · PPTX · PPT · ODT · HWPX · XLSX 문서를 브라우저 안에서 파싱해 Markdown과 JSON으로 보여 주는 ho 문서 파서 레퍼런스 실행기">
+<style>
+/* Layout: left rail (files + options + run history), right workspace (run summary, tabs). */
+:root {
+  --bg: #f4f6f9; --surface: #ffffff; --fg: #1a2130; --muted: #5c6678; --line: #dce1e8; --head: #eef1f6;
+  --accent: #2456c4; --accent-ink: #ffffff; --accent-soft: #e6edfb;
+  --good: #1d7a4f; --good-soft: #e1f3e9; --warn: #8a5a00; --warn-soft: #fbf0d9; --bad: #b42318; --bad-soft: #fdecea;
+  --font: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", Consolas, "D2Coding", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12151b; --surface: #1a1f27; --fg: #e6e9ef; --muted: #9aa3b2; --line: #2e3542; --head: #222833;
+    --accent: #8db0ff; --accent-ink: #0f1420; --accent-soft: #1f2a42;
+    --good: #6fd19c; --good-soft: #17372a; --warn: #f0c062; --warn-soft: #3a2f16; --bad: #ff8a80; --bad-soft: #3d1f1d;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12151b; --surface: #1a1f27; --fg: #e6e9ef; --muted: #9aa3b2; --line: #2e3542; --head: #222833;
+  --accent: #8db0ff; --accent-ink: #0f1420; --accent-soft: #1f2a42;
+  --good: #6fd19c; --good-soft: #17372a; --warn: #f0c062; --warn-soft: #3a2f16; --bad: #ff8a80; --bad-soft: #3d1f1d;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.55 var(--font); word-break: keep-all; overflow-wrap: anywhere; }
+.app { display: grid; grid-template-columns: 320px minmax(0, 1fr); height: 100%; }
+@media (max-width: 860px) { .app { grid-template-columns: minmax(0, 1fr); height: auto; } }
+aside { background: var(--surface); border-right: 1px solid var(--line); padding: 18px 16px; display: flex; flex-direction: column; gap: 16px; overflow: auto; }
+main { padding: 18px 22px 40px; overflow: auto; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+@media (max-width: 860px) { main { padding: 16px; } aside { border-right: 0; border-bottom: 1px solid var(--line); } }
+h1 { font-size: 18px; margin: 0; }
+h1 small { color: var(--muted); font-weight: 400; font-size: 12px; margin-left: 6px; }
+.section-title { font-size: 11.5px; font-weight: 700; color: var(--muted); letter-spacing: .04em; margin: 0 0 8px; }
+.group { display: grid; gap: 10px; }
+.drop { display: flex; flex-direction: column; align-items: center; gap: 6px; border: 2px dashed var(--line); border-radius: 10px;
+        padding: 20px 12px; text-align: center; color: var(--muted); cursor: pointer; background: var(--bg); }
+.drop.over { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.drop.disabled { cursor: progress; opacity: .6; }
+.drop .t { color: var(--fg); font-weight: 600; }
+.drop .f { font-size: 11.5px; line-height: 1.6; }
+.check { display: flex; align-items: center; gap: 8px; white-space: nowrap; cursor: pointer; }
+.check input { margin: 0; width: 16px; height: 16px; flex: none; accent-color: var(--accent); }
+.field { display: grid; gap: 4px; }
+.field-label { font-size: 12.5px; }
+.control { width: 100%; height: 32px; font: inherit; font-size: 13px; padding: 0 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--fg); }
+.control:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+.hint { font-size: 11.5px; color: var(--muted); }
+.divider { border: 0; border-top: 1px solid var(--line); margin: 0; }
+.boot { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); background: var(--bg); border-radius: 8px; padding: 8px 10px; }
+.boot.err { color: var(--bad); background: var(--bad-soft); }
+.runs { display: grid; gap: 6px; }
+.run { text-align: left; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: var(--surface); cursor: pointer; font: inherit; color: inherit; display: grid; gap: 2px; }
+.run:hover { border-color: var(--accent); }
+.run.active { border-color: var(--accent); background: var(--accent-soft); }
+.run .n { font-weight: 600; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.run .s { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.badge { display: inline-block; font-size: 11px; font-weight: 600; border-radius: 999px; padding: 0 8px; white-space: nowrap; }
+.b-ok { background: var(--good-soft); color: var(--good); }
+.b-warn { background: var(--warn-soft); color: var(--warn); }
+.b-bad { background: var(--bad-soft); color: var(--bad); }
+.b-muted { background: var(--head); color: var(--muted); }
+.empty { color: var(--muted); padding: 40px 0; text-align: center; }
+.summary { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 10px; }
+.summary .top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 12px; }
+.summary .top .name { font-size: 16px; font-weight: 700; overflow-wrap: anywhere; }
+.stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+.stat { background: var(--bg); border-radius: 8px; padding: 6px 10px; }
+.stat .k { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.stat .v { font-family: var(--mono); font-size: 15px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.warns { margin: 0; padding-left: 18px; color: var(--warn); font-size: 13px; }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.tab { white-space: nowrap; border: 0; background: none; font: inherit; padding: 8px 12px; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+.tab:focus-visible, button:focus-visible, .run:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; min-width: 0; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.btn { white-space: nowrap; display: inline-block; font: inherit; font-size: 13px; padding: 5px 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); cursor: pointer; text-decoration: none; }
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.primary:hover { color: var(--accent-ink); filter: brightness(1.08); }
+.btn:disabled { opacity: .5; cursor: default; }
+pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 12.5px/1.55 var(--mono); max-height: 70vh; overflow: auto; }
+.el { border-bottom: 1px dashed var(--line); padding: 7px 0; overflow-x: auto; }
+.el:last-child { border-bottom: 0; }
+.cat { display: inline-block; font: 10.5px var(--mono); color: var(--accent); background: var(--accent-soft); border-radius: 4px; padding: 0 5px; margin-right: 6px; vertical-align: 1px; }
+.el table { border-collapse: collapse; font-size: 12.5px; margin: 4px 0; }
+.el td, .el th { border: 1px solid var(--line); padding: 3px 7px; vertical-align: top; min-width: 4.5em; word-break: keep-all; overflow-wrap: normal; }
+.el h1, .el h2, .el h3, .el h4, .el h5, .el h6 { font-size: 15px; margin: 2px 0; }
+.el p { margin: 2px 0; }
+.el img { max-width: 100%; max-height: 260px; border: 1px solid var(--line); border-radius: 4px; background: #fff; }
+.el figure { margin: 0; }
+.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.gallery figure { margin: 0; border: 1px solid var(--line); border-radius: 8px; padding: 8px; display: grid; gap: 6px; }
+.gallery img { max-width: 100%; max-height: 200px; object-fit: contain; background: #fff; }
+.gallery figcaption { font-size: 12px; color: var(--muted); white-space: pre-wrap; }
+.spinner { width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; display: inline-block; animation: spin .8s linear infinite; vertical-align: -2px; flex: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+footer { font-size: 11.5px; line-height: 1.6; color: var(--muted); border-top: 1px solid var(--line); padding-top: 10px; margin-top: auto; display: grid; gap: 6px; }
+footer a { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <h1>ho 레퍼런스 실행기 <small id="ver"></small></h1>
+
+    <div class="boot" id="boot"><span class="spinner"></span><span id="boot-text">준비 중…</span></div>
+
+    <section>
+      <h2 class="section-title">문서</h2>
+      <label class="drop disabled" id="drop" for="file">
+        <span class="t">파일을 끌어다 놓거나 클릭</span>
+        <span class="f">PDF · DOCX · PPTX · PPT<br>ODT · HWPX · XLSX · 여러 개 가능</span>
+      </label>
+      <input type="file" id="file" multiple hidden disabled accept=".pdf,.docx,.docm,.pptx,.pptm,.ppt,.odt,.hwpx,.xlsx,.xlsm">
+    </section>
+
+    <section class="group">
+      <h2 class="section-title">옵션</h2>
+      <label class="check"><input type="checkbox" id="opt-images" checked> 이미지 추출</label>
+      <label class="check"><input type="checkbox" id="opt-comments" checked> DOCX · XLSX 메모 포함</label>
+      <label class="check"><input type="checkbox" id="opt-hidden"> XLSX 숨김 시트 포함</label>
+      <hr class="divider">
+      <label class="field"><span class="field-label">DOCX 변경 추적</span>
+        <select class="control" id="opt-revisions">
+          <option value="accept">모두 수락한 상태로 추출</option>
+          <option value="markup">{++추가++} {--삭제--}로 표시</option>
+        </select>
+      </label>
+      <label class="field"><span class="field-label">PDF 암호</span>
+        <input class="control" type="password" id="opt-pdfpw" autocomplete="off" placeholder="암호가 없으면 비워 두세요">
+      </label>
+    </section>
+
+    <section>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <h2 class="section-title" style="margin:0">실행 기록</h2>
+        <button class="btn" id="zip" disabled title="성공한 문서의 .md · .json · 이미지를 한 번에 저장">전체 결과 ZIP</button>
+      </div>
+      <div class="runs" id="runs"><div class="hint">아직 실행한 문서가 없습니다.</div></div>
+    </section>
+
+    <footer>
+      <div id="notice"></div>
+      <div>파일은 서버로 올라가지 않고 이 브라우저 안(Pyodide)에서만 처리됩니다.
+        브라우저에서는 그림 속 글자 OCR과 PDF의 JPEG 외 그림 추출이 빠집니다. 전체 기능은 <a href="https://github.com/hscho0048/ho-doc-parser">설치형</a>을 쓰세요.</div>
+    </footer>
+  </aside>
+
+  <main id="main">
+    <div class="empty" id="empty">왼쪽에서 문서를 넣으면 추출 결과가 여기에 표시됩니다.</div>
+  </main>
+</div>
+
+<script>
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+const runs = [];          // {name, state, result, urls: {path: blobURL}, files}
+let current = null;       // index into runs
+let tab = "preview";
+let nextId = 1;
+const pending = {};       // message id -> resolve
+
+const worker = new Worker("worker.js");
+worker.onmessage = ({data: m}) => {
+  if (m.type === "status") $("#boot-text").textContent = m.text;
+  else if (m.type === "ready") {
+    $("#ver").textContent = "v" + m.version;
+    $("#notice").textContent = m.notice || "";
+    $("#boot").hidden = true;
+    $("#drop").classList.remove("disabled");
+    $("#file").disabled = false;
+  } else if (m.type === "fatal") {
+    $("#boot").classList.add("err");
+    $("#boot").innerHTML = `파서를 불러오지 못했습니다: ${esc(m.error)}`;
+  } else if (pending[m.id]) {
+    pending[m.id](m);
+    delete pending[m.id];
+  }
+};
+const call = msg => new Promise(res => { const id = nextId++; pending[id] = res; worker.postMessage({...msg, id}, msg.data ? [msg.data] : []); });
+
+const drop = $("#drop");
+["dragenter", "dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); if (!$("#file").disabled) drop.classList.add("over"); }));
+["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => { if (!$("#file").disabled) enqueue([...e.dataTransfer.files]); });
+$("#file").addEventListener("change", e => { enqueue([...e.target.files]); e.target.value = ""; });
+
+let busy = Promise.resolve();
+function enqueue(files) {
+  for (const f of files) {
+    const idx = runs.push({name: f.name, state: "running"}) - 1;
+    renderRuns();
+    busy = busy.then(() => parse(f, idx));
+  }
+}
+
+function options() {
+  return {images: $("#opt-images").checked, comments: $("#opt-comments").checked,
+          hidden_sheets: $("#opt-hidden").checked, revisions: $("#opt-revisions").value,
+          pdf_password: $("#opt-pdfpw").value || null};
+}
+
+const MIME = {png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", bmp: "image/bmp",
+              svg: "image/svg+xml", webp: "image/webp", tif: "image/tiff", tiff: "image/tiff", emf: "image/emf", wmf: "image/wmf"};
+
+async function parse(file, idx) {
+  const run = runs[idx];
+  try {
+    const m = await call({type: "parse", name: file.name, data: await file.arrayBuffer(), options: options()});
+    if (m.type === "error") throw new Error(m.error);
+    run.result = m.result;
+    run.jobId = m.id;
+    run.urls = {};
+    for (const [path, bytes] of Object.entries(m.files || {})) {
+      if (!path.startsWith("result_images/")) continue;
+      const ext = path.split(".").pop().toLowerCase();
+      run.urls[path] = URL.createObjectURL(new Blob([bytes], {type: MIME[ext] || "application/octet-stream"}));
+    }
+    run.state = m.result.success ? (m.result.warnings?.length ? "warn" : "ok") : "bad";
+  } catch (e) {
+    run.state = "bad";
+    run.result = {success: false, error: String(e.message || e), name: file.name, size: file.size};
+  }
+  if (current === null || runs[current].state === "running") current = idx;
+  $("#zip").disabled = !runs.some(r => r.result?.success);
+  renderRuns(); render();
+}
+
+$("#zip").onclick = async () => {
+  const btn = $("#zip");
+  const done = runs.filter(r => r.result && r.jobId);
+  btn.disabled = true; btn.textContent = "묶는 중…";
+  const jobs = done.map(r => ({dir: "/jobs/" + r.jobId, name: r.result.name, success: r.result.success,
+                               file_type: r.result.file_type, error: r.result.error, seconds: r.result.seconds}));
+  const m = await call({type: "zip", jobs});
+  btn.disabled = false; btn.textContent = "전체 결과 ZIP";
+  if (m.type === "zip") download("ho_results.zip", m.data, "application/zip");
+};
+
+function renderRuns() {
+  const box = $("#runs");
+  box.innerHTML = "";
+  runs.forEach((r, i) => {
+    const b = document.createElement("button");
+    b.className = "run" + (i === current ? " active" : "");
+    const res = r.result || {};
+    const status = r.state === "running" ? '<span class="spinner"></span> 실행 중'
+      : r.state === "bad" ? '<span class="badge b-bad">실패</span>'
+      : `<span class="badge ${r.state === "warn" ? "b-warn" : "b-ok"}">${esc(res.file_type)}</span> ${esc(res.seconds)}초`;
+    b.title = r.name;
+    b.innerHTML = `<span class="n">${esc(r.name)}</span><span class="s">${status}</span>`;
+    b.onclick = () => { if (r.state !== "running") { current = i; renderRuns(); render(); } };
+    box.appendChild(b);
+  });
+}
+
+function stat(k, v) { return `<div class="stat"><div class="k">${esc(k)}</div><div class="v">${esc(v ?? "-")}</div></div>`; }
+
+function render() {
+  const main = $("#main");
+  if (current === null) return;
+  const run = runs[current], res = run.result;
+  if (!res) return;
+  const m = res.metadata || {};
+  const els = res.elements?.elements || [];
+  const count = c => els.filter(e => e.category === c).length;
+  const units = m.page_count ? `${m.page_count}쪽` : m.slide_count ? `${m.slide_count}장` : m.sheet_count ? `${m.sheet_count}시트` : "-";
+  main.innerHTML = `
+    <section class="summary">
+      <div class="top"><span class="name">${esc(res.name)}</span>
+        ${res.success ? `<span class="badge b-ok">${esc(res.file_type)}</span>` : `<span class="badge b-bad">실패</span>`}
+        <span class="badge b-muted">${((res.size || 0) / 1024).toFixed(0)} KB</span></div>
+      ${res.success ? "" : `<div class="badge b-bad" style="white-space:normal">${esc(res.error)}</div>`}
+      <div class="stats">
+        ${stat("처리 시간", res.seconds != null ? res.seconds + " 초" : null)}
+        ${stat("분량", units)}
+        ${stat("표", count("table"))}
+        ${stat("그림", (res.images || []).length)}
+        ${stat("제목", count("heading1"))}
+        ${stat("글자 수", (m.char_count ?? 0).toLocaleString())}
+      </div>
+      ${res.warnings?.length ? `<ul class="warns">${res.warnings.map(w => `<li>${esc(w)}</li>`).join("")}</ul>` : ""}
+    </section>
+    ${res.success ? `
+    <nav class="tabs" role="tablist">
+      ${[["preview", "미리보기"], ["markdown", "Markdown"], ["json", "JSON (elements)"], ["images", `이미지 (${(res.images || []).length})`]]
+        .map(([k, l]) => `<button class="tab ${tab === k ? "active" : ""}" data-tab="${k}" role="tab">${l}</button>`).join("")}
+    </nav>
+    <section class="panel" id="panel"></section>` : ""}`;
+  main.querySelectorAll(".tab").forEach(t => t.onclick = () => { tab = t.dataset.tab; render(); });
+  if (res.success) renderTab(run);
+}
+
+function withBlobs(html, run) {
+  // markdown/HTML point at result_images/img_001.png; swap in the blob URLs of the extracted files
+  return html.replace(/(src=")(result_images\/[^"]+)"/g, (all, a, path) => run.urls[path] ? `${a}${run.urls[path]}"` : all);
+}
+
+function elementsHtml(run) {
+  return (run.result.elements?.elements || []).map(e =>
+    `<div class="el"><span class="cat">${esc(e.category)}</span>${withBlobs(e.content.html, run)}</div>`
+  ).join("") || '<div class="empty">추출된 내용이 없습니다.</div>';
+}
+
+function download(name, data, type) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([data], {type}));
+  a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+function renderTab(run) {
+  const res = run.result, panel = $("#panel");
+  const stem = res.name.replace(/\.[^.]+$/, "");
+  if (tab === "preview") {
+    panel.innerHTML = elementsHtml(run);
+  } else if (tab === "markdown") {
+    panel.innerHTML = `<div class="toolbar"><button class="btn" id="copy">복사</button><button class="btn" id="dl">.md 저장</button></div><pre id="md"></pre>`;
+    $("#md").textContent = res.markdown;
+    $("#copy").onclick = async () => { try { await navigator.clipboard.writeText(res.markdown); $("#copy").textContent = "복사됨"; } catch { getSelection().selectAllChildren($("#md")); } };
+    $("#dl").onclick = () => download(stem + ".md", res.markdown, "text/markdown");
+  } else if (tab === "json") {
+    const text = JSON.stringify(res.elements, null, 2);
+    panel.innerHTML = `<div class="toolbar"><button class="btn" id="dl">.json 저장</button></div><pre id="js"></pre>`;
+    $("#js").textContent = text;
+    $("#dl").onclick = () => download(stem + ".json", text, "application/json");
+  } else if (tab === "images") {
+    const imgs = res.images || [];
+    panel.innerHTML = imgs.length ? `<div class="gallery">${imgs.map(f => {
+      const url = run.urls[f.path] || "";
+      return `<figure><img src="${esc(url)}" alt="${esc(f.alt)}" loading="lazy">
+        <figcaption>${esc(f.name)}${f.width ? ` · ${f.width}×${f.height}` : ""}${f.alt ? "\n" + esc(f.alt) : ""}</figcaption>
+        <a class="btn" href="${esc(url)}" download="${esc(stem + "_" + f.name)}">저장</a></figure>`;
+    }).join("")}</div>` : '<div class="empty">이미지가 없습니다.</div>';
+  }
+}
+</script>
+</body>
+</html>

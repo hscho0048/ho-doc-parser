@@ -1,0 +1,5 @@
+-r requirements.txt
+# optional: text inside pictures (--ocr) and per-file RAM / CPU numbers in the local GUI
+rapidocr>=3.4             # Apache-2.0 (PP-OCRv5 mobile models, downloaded on first use)
+onnxruntime>=1.18         # MIT
+psutil>=5.9               # BSD-3 - local GUI resource stats

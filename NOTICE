@@ -1,0 +1,78 @@
+docparser (ho)
+Copyright (c) 2026 hscho0048
+
+======================================================================
+1. HWPX file format
+======================================================================
+
+본 제품은 한컴의 HWP 문서 파일(.hwp) 공개 문서를 참고하여 개발하였습니다.
+
+- The HWPX parser (docparser/parsers/hwpx.py) is original code written from Hancom's published file
+  format documents (https://store.hancom.com/etc/hwpDownload.do). HWPX follows OWPML (KS X 6101).
+- Hancom's conditions: the sentence above must appear in the product's user interface, manual,
+  help and source code (whichever exist); the format documents themselves may only be redistributed
+  unmodified; Hancom gives no warranty on the accuracy of derived works.
+- Password-protected HWPX documents are not decrypted. Binary HWP (.hwp) is not supported.
+
+======================================================================
+2. Other file format specifications
+======================================================================
+
+- PowerPoint 97-2003 (.ppt): implemented from Microsoft's [MS-PPT] / [MS-ODRAW] Open Specifications
+  (Microsoft Open Specifications Promise). No code copied.
+- OpenDocument (.odt): OASIS ODF standard, read through odfpy.
+
+======================================================================
+3. Runtime dependencies (installed by pip; each ships its own license file)
+======================================================================
+
+  pdfplumber 0.11 .......... MIT          (c) Jeremy Singer-Vine
+  pdfminer.six ............. MIT
+  pypdfium2 (+ PDFium) ..... BSD-3-Clause / Apache-2.0; PDFium's bundled third-party libraries
+                             (FreeType, libjpeg-turbo, OpenJPEG, lcms2, zlib, ...) carry their own
+                             permissive licenses, shipped inside the pypdfium2 package
+  pillow ................... MIT-CMU (HPND)
+  charset-normalizer ....... MIT
+  cryptography ............. Apache-2.0 OR BSD-3-Clause   (cffi MIT-0, pycparser BSD-3-Clause)
+  python-docx .............. MIT
+  python-pptx .............. MIT          (XlsxWriter BSD-2-Clause)
+  odfpy .................... used under Apache-2.0 (odfpy is offered under Apache-2.0 / GPL-2.0+ / LGPL)
+  olefile .................. BSD-2-Clause
+  openpyxl / et-xmlfile .... MIT
+  lxml ..................... BSD-3-Clause (bundles libxml2/libxslt, MIT)
+  defusedxml ............... PSF-2.0
+  typing_extensions ........ PSF-2.0
+
+======================================================================
+4. Optional OCR (docparser/ocr.py, `--ocr`)
+======================================================================
+
+  rapidocr ................. Apache-2.0   https://github.com/RapidAI/RapidOCR
+  PP-OCRv5 mobile models ... Apache-2.0   (PaddleOCR: PP-OCRv5_mobile_det, korean_PP-OCRv5_mobile_rec)
+  onnxruntime .............. MIT          (ships ThirdPartyNotices.txt)
+  opencv-python ............ Apache-2.0
+      ! FFmpeg is redistributed inside every opencv-python wheel under LGPL-2.1
+        (see cv2/LICENSE-3RD-PARTY.txt). When you redistribute opencv-python (installer, container
+        image, bundled app) keep FFmpeg as the separate replaceable library it is, ship the LGPL-2.1
+        text, and point to the FFmpeg source for that version.
+  numpy BSD-3-Clause · shapely BSD-3-Clause · pyclipper MIT · PyYAML MIT · omegaconf BSD-3-Clause
+  antlr4-python3-runtime BSD-3-Clause · colorlog MIT · requests Apache-2.0 · urllib3 MIT · idna BSD-3
+  six MIT · protobuf BSD-3-Clause · flatbuffers Apache-2.0 · packaging Apache-2.0 OR BSD-2-Clause
+  tqdm MPL-2.0 AND MIT · certifi MPL-2.0
+      (MPL-2.0 is file-level copyleft: only changes to those packages' own files must be shared.)
+
+======================================================================
+5. Not used because of copyleft terms
+======================================================================
+
+  PyMuPDF / MuPDF (AGPL-3.0), pyhwp (AGPL-3.0), marker (GPL-3.0), MinerU (AGPL-3.0)
+
+======================================================================
+6. Web version (site/, GitHub Pages)
+======================================================================
+
+  Pyodide .................. MPL-2.0      loaded from cdn.jsdelivr.net at run time (not redistributed here)
+  The Pages build bundles pdfplumber (MIT) and an odfpy wheel (Apache-2.0) next to docparser; the other
+  packages listed in section 3 are fetched from PyPI / the Pyodide CDN by the visitor's browser.
+
+Development-only tools (not part of a distribution): pytest MIT, reportlab BSD, pywin32 PSF.
