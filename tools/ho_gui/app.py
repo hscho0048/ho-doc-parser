@@ -29,6 +29,44 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 sys.path.insert(0, str(ROOT))
 
+
+def _has(*modules: str) -> bool:
+    import importlib.util
+    return all(importlib.util.find_spec(m) is not None for m in modules)
+
+
+def _venv_python(name: str):
+    for rel in ("Scripts/python.exe", "bin/python"):   # Windows, macOS/Linux
+        p = ROOT / name / rel
+        if p.is_file():
+            return p
+    return None
+
+
+def _ensure_interpreter() -> None:
+    """Started with a Python that lacks the parser packages (or OCR)? Re-run with the project's
+    .venv-ocr / .venv if there is one, so `python tools/ho_gui/app.py` works from any shell."""
+    deps = _has("docx", "pptx", "pdfplumber", "openpyxl", "odf", "olefile")
+    ocr = _has("rapidocr", "onnxruntime")
+    if deps and ocr:
+        return
+    here = Path(sys.executable).resolve()
+    for name in (".venv-ocr", ".venv") if not deps else (".venv-ocr",):
+        py = _venv_python(name)
+        if py is not None and py.resolve() != here:
+            print(f"{sys.executable} 에는 {'파서 패키지' if not deps else 'OCR 패키지'}가 없어 {py} 로 다시 실행합니다.")
+            try:
+                sys.exit(subprocess.call([str(py), str(Path(__file__).resolve()), *sys.argv[1:]]))
+            except KeyboardInterrupt:   # Ctrl+C reaches the child too; it cleans up its own temp folder
+                sys.exit(0)
+    if not deps:
+        sys.exit(f"{sys.executable} 에 파서 패키지가 없습니다. 프로젝트 폴더에서 가상환경을 만들고 설치하세요:\n"
+                 "  python -m venv .venv   그리고   pip install -r requirements-ocr.txt   (README '로컬 설치' 참고)")
+
+
+if __name__ == "__main__":
+    _ensure_interpreter()
+
 from docparser import HWP_NOTICE, __version__  # noqa: E402
 from docparser.detect import EXTENSION_MAP  # noqa: E402
 
